@@ -1,0 +1,1 @@
+0 9 * * * root cd /app && python main.py >> /var/log/release-monitor.log 2>&1

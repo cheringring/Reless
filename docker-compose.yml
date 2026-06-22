@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  release-monitor:
+    build: .
+    container_name: dataiku-release-monitor
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
