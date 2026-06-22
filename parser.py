@@ -108,15 +108,25 @@ def extract_version_detail(html: str, version: str, anchor: str = "") -> str:
 
 
 def _extract_anchor_section(soup: BeautifulSoup, anchor: str) -> str:
-    """anchor id에 해당하는 헤딩 섹션의 텍스트를 추출합니다.
+    """anchor id에 해당하는 섹션 텍스트를 추출합니다.
 
-    해당 id를 가진 요소를 찾고, 동일 레벨의 다음 헤딩이 나올 때까지 수집합니다.
+    Sphinx 구조: <section id="version-14-7-0-..."> 안에 h2 + 본문이 포함됨.
+    id가 section/div 컨테이너에 있으면 그 내부 전체를 추출합니다.
+    id가 heading 자체에 있으면 다음 동급 heading 전까지를 추출합니다.
     """
     start_el = soup.find(id=anchor)
     if not start_el:
         return ""
 
-    heading_tag = start_el if start_el.name in ("h1","h2","h3","h4") else start_el.find_parent(re.compile(r"^h[1-4]$"))
+    # Sphinx 구조: id가 <section> 또는 <div> 컨테이너에 있는 경우
+    if start_el.name in ("section", "div", "article"):
+        text = start_el.get_text(separator="\n", strip=True)
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        return "\n".join(lines)
+
+    # id가 <h2> 등 heading 자체에 있는 경우 — 다음 동급 heading까지 수집
+    heading_tag = start_el if start_el.name in ("h1", "h2", "h3", "h4") \
+        else start_el.find_parent(re.compile(r"^h[1-4]$"))
     if not heading_tag:
         heading_tag = start_el
 
