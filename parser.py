@@ -120,8 +120,24 @@ def _extract_anchor_section(soup: BeautifulSoup, anchor: str) -> str:
 
     # Sphinx 구조: id가 <section> 또는 <div> 컨테이너에 있는 경우
     if start_el.name in ("section", "div", "article"):
+        for a in start_el.find_all("a", class_="headerlink"):
+            a.decompose()
+        for a in start_el.find_all("a", href=True):
+            href = a["href"]
+            link_text = a.get_text(strip=True)
+            if not link_text:
+                a.decompose()
+                continue
+            if href.startswith("http"):
+                a.replace_with(f"[{link_text}]({href})")
+            elif href.startswith("/"):
+                a.replace_with(f"[{link_text}](https://doc.dataiku.com{href})")
+            elif not href.startswith("#"):
+                a.replace_with(f"[{link_text}](https://doc.dataiku.com/dss/latest/release_notes/{href})")
+            else:
+                a.replace_with(link_text)
         text = start_el.get_text(separator="\n", strip=True)
-        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        lines = [l.strip() for l in text.splitlines() if l.strip() and l.strip() != "¶"]
         return "\n".join(lines)
 
     # id가 <h2> 등 heading 자체에 있는 경우 — 다음 동급 heading까지 수집

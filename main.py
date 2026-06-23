@@ -1,4 +1,5 @@
 import logging
+import re
 import sys
 
 import detector
@@ -58,7 +59,8 @@ def run() -> None:
             [v["version"] for v in new_versions],
         )
         detail_texts = _fetch_version_details(new_versions)
-        summary = summarizer.summarize_new_versions(new_versions, detail_texts)
+        linked_pages = _fetch_linked_pages(detail_texts)
+        summary = summarizer.summarize_new_versions(new_versions, detail_texts, linked_pages)
         mailer.send_change_notification(new_versions, summary, config.TARGET_URL)
     else:
         logger.info("버전 목록 변경 없음 (페이지 내용 수정 감지)")
@@ -102,6 +104,28 @@ def _fetch_version_details(versions: list[dict]) -> dict[str, str]:
             detail_texts[v["version"]] = f"(상세 페이지 로드 실패: {exc})"
 
     return detail_texts
+
+
+_MD_LINK_RE = re.compile(r'\[([^\]]+)\]\((https://doc\.dataiku\.com/[^)]+)\)')
+
+
+def _fetch_linked_pages(detail_texts: dict[str, str]) -> dict[str, str]:
+    """detail_texts 내 doc.dataiku.com 링크를 fetch하여 {label: content} 반환."""
+    linked: dict[str, str] = {}
+    seen: set[str] = set()
+    for text in detail_texts.values():
+        for label, url in _MD_LINK_RE.findall(text):
+            if "release_notes" in url or url in seen:
+                continue
+            seen.add(url)
+            try:
+                logger.info("링크 페이지 fetch: [%s] %s", label, url)
+                page_html = scraper.fetch_page(url)
+                content = parser.extract_content(page_html)
+                linked[label] = content[:4000]
+            except Exception as exc:
+                logger.warning("링크 페이지 로드 실패 %s: %s", url, exc)
+    return linked
 
 
 def _try_send_error(error_message: str) -> None:
